@@ -2,7 +2,6 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.utils.data import Dataset, DataLoader
-from transformers import AutoTokenizer
 import re
 from collections import Counter
 from sklearn.model_selection import train_test_split
@@ -12,41 +11,51 @@ import evaluate
 import nltk
 nltk.download('punkt')
 
-# === Config ===
-MODEL_NAME = "Helsinki-NLP/opus-mt-en-es"
-MAX_LENGTH = 64
-BATCH_SIZE = 16
+
+# === Tokenizer and Vocab ===
+def tokenize(text):
+    return re.findall(r"\b\w+\b", text.lower())
 
 
-# === Load Tokenizer ===
-tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME)
-vocab_size = tokenizer.vocab_size
+class Vocab:
+    def __init__(self, texts, min_freq=1):
+        counter = Counter()
+        for text in texts:
+            counter.update(tokenize(text))
 
+        self.itos = ['<pad>', '<sos>', '<eos>', '<unk>'] + [word for word, freq in counter.items() if freq >= min_freq]
+        self.stoi = {word: i for i, word in enumerate(self.itos)}
+
+    def encode(self, text):
+        return [1] + [self.stoi.get(tok, self.stoi['<unk>']) for tok in tokenize(text)] + [2]
+
+    def decode(self, indices):
+        return ' '.join([self.itos[i] for i in indices if i not in [0, 1, 2]])
+
+    def __len__(self):
+        return len(self.itos)
 
 # === Dataset and Dataloader ===
 class TranslationDataset(Dataset):
-    def __init__(self, src_texts, tgt_texts, tokenizer):
+    def __init__(self, src_texts, tgt_texts, src_vocab, tgt_vocab):
         self.src = src_texts
         self.tgt = tgt_texts
-        self.tokenizer = tokenizer
-        self.max_len = max_len
-        
+        self.src_vocab = src_vocab
+        self.tgt_vocab = tgt_vocab
+
     def __len__(self):
         return len(self.src)
 
     def __getitem__(self, idx):
-        # return torch.tensor(self.src_vocab.encode(self.src[idx])), torch.tensor(self.tgt_vocab.encode(self.tgt[idx]))
-        src_enc = tokenizer(self.src[idx], return_tensors="pt", padding="max_length", truncation=True, max_length=MAX_LENGTH)
-        tgt_enc = tokenizer(self.tgt[idx], return_tensors="pt", padding="max_length", truncation=True, max_length=MAX_LENGTH)
-        return src_enc["input_ids"].squeeze(0), tgt_enc["input_ids"].squeeze(0)
+        return torch.tensor(self.src_vocab.encode(self.src[idx])), torch.tensor(self.tgt_vocab.encode(self.tgt[idx]))
 
 
 
 def collate_fn(batch):
-    src, tgt = zip(*batch)
-    src = torch.stack(src)
-    tgt = torch.stack(tgt)
-    return src, tgt
+    src_batch, tgt_batch = zip(*batch)
+    src_padded = nn.utils.rnn.pad_sequence(src_batch, batch_first=True, padding_value=0)
+    tgt_padded = nn.utils.rnn.pad_sequence(tgt_batch, batch_first=True, padding_value=0)
+    return src_padded, tgt_padded
 
 
 # === Positional Encoding ===
@@ -143,15 +152,15 @@ class DecoderLayer(nn.Module):
 
 
 class Transformer(nn.Module):
-    def __init__(self, vocab_size, d_model=256, num_heads=8, num_layers=4):
+    def __init__(self, src_vocab_size, tgt_vocab_size, d_model=256, num_heads=8, num_layers=4):
         super().__init__()
-        self.src_embed = nn.Embedding(vocab_size, d_model)
-        self.tgt_embed = nn.Embedding(vocab_size, d_model)
+        self.src_embed = nn.Embedding(src_vocab_size, d_model)
+        self.tgt_embed = nn.Embedding(tgt_vocab_size, d_model)
         self.pos_enc = PositionalEncoding(d_model)
 
         self.encoder = nn.ModuleList([EncoderLayer(d_model, num_heads) for _ in range(num_layers)])
         self.decoder = nn.ModuleList([DecoderLayer(d_model, num_heads) for _ in range(num_layers)])
-        self.out = nn.Linear(d_model, vocab_size)
+        self.out = nn.Linear(d_model, tgt_vocab_size)
 
     def encode(self, src, src_mask):
         x = self.pos_enc(self.src_embed(src))
@@ -172,7 +181,7 @@ class Transformer(nn.Module):
 
 # === Masks ===
 def create_mask(seq, pad_idx=0):
-    return (seq != tokenizer.pad_token_id).unsqueeze(1).unsqueeze(2)
+    return (seq != pad_idx).unsqueeze(1).unsqueeze(2)
 
 def create_subsequent_mask(size):
     return torch.tril(torch.ones((size, size), dtype=torch.bool))
@@ -204,7 +213,7 @@ def train_epoch(model, dataloader, optimizer, criterion, device):
 bleu_metric = evaluate.load("bleu")
 rouge_metric = evaluate.load("rouge")
 
-def evaluate(model, dataloader, tokenizer, device):
+def evaluate(model, dataloader, src_vocab, tgt_vocab, device):
     model.eval()
     preds = []
     refs = []
@@ -217,7 +226,7 @@ def evaluate(model, dataloader, tokenizer, device):
 
             ys = torch.ones(src.size(0), 1).fill_(1).long().to(device)  # <sos>
 
-            for _ in range(30):  # max length
+            for _ in range(64):  # max length
                 tgt_mask = create_subsequent_mask(ys.size(1)).to(device)
                 out = model.decode(ys, memory, tgt_mask, src_mask)
                 next_word = out[:, -1].argmax(-1).unsqueeze(1)
@@ -226,8 +235,8 @@ def evaluate(model, dataloader, tokenizer, device):
                     break
 
             for pred_seq, true_seq in zip(ys, tgt):
-                pred_text = tokenizer.decode(pred_seq.tolist(), skip_special_tokens=True)
-                true_text = tokenizer.decode(true_seq.tolist(), skip_special_tokens=True)
+                pred_text = tgt_vocab.decode(pred_seq.cpu().tolist())
+                true_text = tgt_vocab.decode(true_seq.cpu().tolist())
 
                 preds.append(pred_text)
                 refs.append(true_text)
