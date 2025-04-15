@@ -1,0 +1,9 @@
+torch
+rouge
+evaluate
+transformers
+sklearn
+pandas
+rouge-score
+nltk
+streamlit
