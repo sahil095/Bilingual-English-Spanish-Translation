@@ -13,7 +13,7 @@ This project supports:
 ---
 
 ## 🚀 Project Structure
-
+```
 .
 ├── app.py                    # Streamlit web UI
 ├── train.py                  # Training loop with evaluation and checkpointing
@@ -23,6 +23,7 @@ This project supports:
 ├── requirements.txt          # Requirements file 
 └── README.md
 
+```bash
 ---
 
 ## 🧠 Model Architecture
