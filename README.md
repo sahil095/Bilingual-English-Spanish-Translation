@@ -23,8 +23,7 @@ This project supports:
 ├── requirements.txt          # Requirements file 
 └── README.md
 
-```bash
----
+```
 
 ## 🧠 Model Architecture
 
