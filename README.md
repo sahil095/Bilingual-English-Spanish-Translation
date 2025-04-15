@@ -16,14 +16,15 @@ This project supports:
 
 ```bash
 .
-├── app.py                     # Streamlit web UI
+├── app.py                    # Streamlit web UI
 ├── train.py                  # Training loop with evaluation and checkpointing
 ├── translation_model.py      # Core Transformer architecture & utilities
+├── decode_utils.py           # decoding functions BEAM and Greedy
 ├── english_spanish.csv       # Dataset
-├── requirements.txt           # Requirements file 
+├── requirements.txt          # Requirements file 
 └── README.md
 
-🧠 Model Architecture
+# 🧠 Model Architecture
 This is a classic encoder-decoder Transformer, built using PyTorch:
 
 - Multi-Head Self-Attention
@@ -34,3 +35,12 @@ This is a classic encoder-decoder Transformer, built using PyTorch:
 
 The model was trained on ~300,000 English-Spanish pairs.
 
+## Results (trained on smaller dataset):
+BLEU Scores: ~36%
+ROUGE Scores: ~46%
+
+## Next Steps:
+✅ Pretrained multilingual models like MBart50 for faster convergence and real-world performance
+✅ Replacing the custom tokenizer with AutoTokenizer from Hugging Face for subword and BPE support
+✅ Scaling up with larger datasets (e.g., Europarl, Tatoeba), longer training, and better hardware utilization
+✅ Cloud deployment using AWS or GCP to host the model and Streamlit app as a translation service
