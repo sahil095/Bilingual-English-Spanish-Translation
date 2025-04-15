@@ -24,7 +24,9 @@ This project supports:
 ├── requirements.txt          # Requirements file 
 └── README.md
 
-# 🧠 Model Architecture
+---
+
+## 🧠 Model Architecture
 This is a classic encoder-decoder Transformer, built using PyTorch:
 
 - Multi-Head Self-Attention
@@ -32,6 +34,8 @@ This is a classic encoder-decoder Transformer, built using PyTorch:
 - Layer Normalization
 - Masked Decoding
 - Beam Search & Greedy Decoding
+
+```bash
 
 The model was trained on ~300,000 English-Spanish pairs.
 
