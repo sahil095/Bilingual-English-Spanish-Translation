@@ -14,7 +14,6 @@ This project supports:
 
 ## 🚀 Project Structure
 
-```bash
 .
 ├── app.py                    # Streamlit web UI
 ├── train.py                  # Training loop with evaluation and checkpointing
@@ -27,6 +26,7 @@ This project supports:
 ---
 
 ## 🧠 Model Architecture
+
 This is a classic encoder-decoder Transformer, built using PyTorch:
 
 - Multi-Head Self-Attention
@@ -35,9 +35,7 @@ This is a classic encoder-decoder Transformer, built using PyTorch:
 - Masked Decoding
 - Beam Search & Greedy Decoding
 
-```bash
-
-The model was trained on ~300,000 English-Spanish pairs.
+The dataset has ~300,00 data points. Trained on a smaller subset of data.
 
 ## Results (trained on smaller dataset):
 BLEU Scores: ~36%
